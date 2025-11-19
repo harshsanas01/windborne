@@ -1,65 +1,54 @@
-import Image from "next/image";
 
-export default function Home() {
+'use client';
+import dynamic from 'next/dynamic';
+const MapView = dynamic(() => import('./components/MapView'), { ssr: false });
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Timebar from './components/Timebar';
+
+export default function Page() {
+  const [data, setData] = useState<any>(null);
+  const [hour, setHour] = useState(0);
+  const [email, setEmail] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    const r = await fetch('/api/constellation', { cache: 'no-store' });
+    const j = await r.json();
+    setData(j);
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const count = useMemo(() => {
+    if (!data?.tracks) return 0;
+    const cutoff = Math.floor(Date.now() / 1000) - hour * 3600;
+    return data.tracks.filter((tr: any) => tr.points.some((p: any) => p.t <= cutoff)).length;
+  }, [data, hour]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <div className="header" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <b>WindBorne 24h Live</b>
+        <Timebar onChange={setHour} />
+        <span className="badge">{count} balloons</span>
+      </div>
+
+      <MapView data={data} hour={hour} />
+
+      <div className="footer" style={{ display:'flex', gap:12, alignItems:'center', flexWrap:'wrap', marginTop: 8 }}>
+        <input className="input" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} />
+        <input className="input" style={{ minWidth: 320 }} placeholder="Ask a question to the team" value={msg} onChange={e=>setMsg(e.target.value)} />
+        <button className="button" onClick={async ()=>{
+          const r = await fetch('/api/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, message: msg }) });
+          const j = await r.json();
+          alert(j.ok ? 'Sent to WindBorne (200)' : `Not accepted (${j.status})`);
+        }}>Send question</button>
+      </div>
+    </>
   );
 }
